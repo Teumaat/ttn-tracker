@@ -1,11 +1,11 @@
 #include <lmic.h>
 #include <hal/hal.h>
 #include <SPI.h>
-//#include <SoftwareSerial.h>
-//#include <TinyGPS.h>
+#include <SoftwareSerial.h>
+#include <TinyGPS.h>
 
-//TinyGPS gps;
-//SoftwareSerial ss(7,8);
+TinyGPS gps;
+SoftwareSerial ss(7,8);
 
 // LoRaWAN NwkSKey, network session key
 static const PROGMEM u1_t NWKSKEY[16] = { 0x1E, 0xC9, 0x6A, 0x66, 0x67, 0x98, 0xCE, 0x15, 0x6C, 0xB2, 0x55, 0xD9, 0x6E, 0x90, 0x7D, 0xDC };
@@ -23,12 +23,12 @@ void os_getArtEui (u1_t* buf) { }
 void os_getDevEui (u1_t* buf) { }
 void os_getDevKey (u1_t* buf) { }
 
-byte coords[20] = "1234567890123456789";
+byte coords[20];
 static osjob_t sendjob;
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 60;
+const unsigned TX_INTERVAL = 300;
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -39,6 +39,7 @@ const lmic_pinmap lmic_pins = {
 };
 
 void onEvent (ev_t ev) {
+  /*
   Serial.print(os_getTime());
   Serial.print(": ");
   switch(ev) {
@@ -101,21 +102,25 @@ void onEvent (ev_t ev) {
       Serial.println(F("Unknown event"));
       break;
   }
+  */
+  if (ev == EV_TXCOMPLETE) {
+    os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
+  }
 }
 
 void do_send(osjob_t* j){
   // Check if there is not a current TX/RX job running
   if (LMIC.opmode & OP_TXRXPEND) {
-    Serial.println(F("OP_TXRXPEND, not sending"));
+//    Serial.println(F("OP_TXRXPEND, not sending"));
   } else {
     // Prepare upstream data transmission at the next possible time.
-//    get_coords();
+    get_coords();
     LMIC_setTxData2(1, (uint8_t*) coords, sizeof(coords)-1, 0);
-    Serial.println(F("Packet queued"));
+//    Serial.println(F("Packet queued"));
   }
   // Next TX is scheduled after TX_COMPLETE event.
 }
-/*
+
 void get_coords () {
   bool newData = false;
   unsigned long chars;
@@ -144,22 +149,22 @@ void get_coords () {
   }
   
   gps.stats(&chars, &sentences, &failed);
-  char lat[9];
-  char lon[10];
+  char lat[10];
+  char lon[9];
   dtostrf(flat, 9, 6, lat);
-  dtostrf(flon, 10, 6, lon);
+  dtostrf(flon, 8, 6, lon);
   String message = String(lat) + ";" + String(lon);
-  Serial.println( message );
-  Serial.println( flat, 6);
-  Serial.println( flon, 6);
+//  Serial.println( message );
+//  Serial.println( flat, 6);
+//  Serial.println( flon, 6);
   message.getBytes( coords, message.length()+1);
 }
-*/
-void setup() {
-  Serial.begin(115200);
-  Serial.println(F("Starting"));
 
-//  ss.begin(9600);
+void setup() {
+//  Serial.begin(115200);
+//  Serial.println(F("Starting"));
+
+  ss.begin(9600);
 
   #ifdef VCC_ENABLE
   // For Pinoccio Scout boards
@@ -219,12 +224,14 @@ void setup() {
   LMIC.dn2Dr = DR_SF9;
 
   // Set data rate and transmit power for uplink (note: txpow seems to be ignored by the library)
-  LMIC_setDrTxpow(DR_SF7,14);
+  LMIC_setDrTxpow(DR_SF7, 100);
 
   // Start job
   do_send(&sendjob);
 }
 
 void loop() {
+//  get_coords();
+//  delay(1000);
   os_runloop_once();
 }
