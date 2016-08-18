@@ -23,7 +23,7 @@ void os_getArtEui (u1_t* buf) { }
 void os_getDevEui (u1_t* buf) { }
 void os_getDevKey (u1_t* buf) { }
 
-byte coords[20];
+uint8_t coords[8];
 static osjob_t sendjob;
 
 // Schedule TX every this many seconds (might become longer due to duty
@@ -149,15 +149,22 @@ void get_coords () {
   }
   
   gps.stats(&chars, &sentences, &failed);
-  char lat[10];
-  char lon[9];
-  dtostrf(flat, 9, 6, lat);
-  dtostrf(flon, 8, 6, lon);
-  String message = String(lat) + ";" + String(lon);
-//  Serial.println( message );
-//  Serial.println( flat, 6);
-//  Serial.println( flon, 6);
-  message.getBytes( coords, message.length()+1);
+
+  int32_t lat = 0;
+  int32_t lon = 0;
+
+  lat = flat * 100000;
+  lon = flon * 100000;
+
+  coords[0] = lat >> 24;
+  coords[1] = lat >> 16;
+  coords[2] = lat >> 8;
+  coords[3] = lat;
+
+  coords[4] = lon >> 24;
+  coords[5] = lon >> 16;
+  coords[6] = lon >> 8;
+  coords[7] = lon;
 }
 
 void setup() {
