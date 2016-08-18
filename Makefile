@@ -21,4 +21,4 @@ update:
 	platformio -f -c vim update
 
 monitor:
-	platformio serialports monitor -b 31250
+	platformio serialports monitor -b 115200

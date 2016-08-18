@@ -7,14 +7,23 @@
 TinyGPS gps;
 SoftwareSerial ss(7,8);
 
+#define JOHAN
+// #define PIETER
+
+#ifdef PIETER
 // LoRaWAN NwkSKey, network session key
-static const PROGMEM u1_t NWKSKEY[16] = { 0x1E, 0xC9, 0x6A, 0x66, 0x67, 0x98, 0xCE, 0x15, 0x6C, 0xB2, 0x55, 0xD9, 0x6E, 0x90, 0x7D, 0xDC };
-
+static const PROGMEM u1_t NWKSKEY[16] = {0x1E, 0xC9, 0x6A, 0x66, 0x67, 0x98, 0xCE, 0x15, 0x6C, 0xB2, 0x55, 0xD9, 0x6E, 0x90, 0x7D, 0xDC};
 // LoRaWAN AppSKey, application session key
-static const u1_t PROGMEM APPSKEY[16] = { 0xC9, 0xB5, 0xDD, 0x45, 0x52, 0x3F, 0xAC, 0xE7, 0x9B, 0xCC, 0x53, 0xEB, 0x76, 0x95, 0x12, 0x70 };
-
+static const u1_t PROGMEM APPSKEY[16] = {0xC9, 0xB5, 0xDD, 0x45, 0x52, 0x3F, 0xAC, 0xE7, 0x9B, 0xCC, 0x53, 0xEB, 0x76, 0x95, 0x12, 0x70};
 // LoRaWAN end-device address (DevAddr)
-static const u4_t DEVADDR = 0x384261A9 ; // <-- Change this address for every node!
+static const u4_t DEVADDR = 0x384261A9 ;
+#endif
+
+#ifdef JOHAN
+static const PROGMEM u1_t NWKSKEY[16] = {0x0C, 0xA1, 0x7F, 0x22, 0x03, 0x41, 0x2D, 0x8A, 0x50, 0x3F, 0x00, 0x8D, 0x39, 0xA1, 0x9E, 0x5C};
+static const u1_t PROGMEM APPSKEY[16] = {0x4C, 0x0B, 0x14, 0xE8, 0x9D, 0x37, 0xA6, 0x4F, 0x96, 0x4E, 0xBC, 0x77, 0xB5, 0x89, 0x7B, 0xAA};
+static const u4_t DEVADDR = 0xC284D049 ;
+#endif
 
 // These callbacks are only used in over-the-air activation, so they are
 // left empty here (we cannot leave them out completely unless
@@ -28,7 +37,7 @@ static osjob_t sendjob;
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 300;
+const unsigned TX_INTERVAL = 60;
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -39,7 +48,6 @@ const lmic_pinmap lmic_pins = {
 };
 
 void onEvent (ev_t ev) {
-  /*
   Serial.print(os_getTime());
   Serial.print(": ");
   switch(ev) {
@@ -102,21 +110,20 @@ void onEvent (ev_t ev) {
       Serial.println(F("Unknown event"));
       break;
   }
-  */
-  if (ev == EV_TXCOMPLETE) {
-    os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
-  }
+  //if (ev == EV_TXCOMPLETE) {
+  //  os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
+  //}
 }
 
 void do_send(osjob_t* j){
   // Check if there is not a current TX/RX job running
   if (LMIC.opmode & OP_TXRXPEND) {
-//    Serial.println(F("OP_TXRXPEND, not sending"));
+    Serial.println(F("OP_TXRXPEND, not sending"));
   } else {
     // Prepare upstream data transmission at the next possible time.
     get_coords();
-    LMIC_setTxData2(1, (uint8_t*) coords, sizeof(coords)-1, 0);
-//    Serial.println(F("Packet queued"));
+    LMIC_setTxData2(1, (uint8_t*) coords, sizeof(coords), 0);
+    Serial.println(F("Packet queued"));
   }
   // Next TX is scheduled after TX_COMPLETE event.
 }
@@ -129,76 +136,85 @@ void get_coords () {
   unsigned long age;
 
   // For one second we parse GPS data and report some key values
-  for (unsigned long start = millis(); millis() - start < 1000;)
-  {
-    while (ss.available())
-    {
+  for (unsigned long start = millis(); millis() - start < 1000;) {
+    while (ss.available()) {
       char c = ss.read();
-//      Serial.write(c); // uncomment this line if you want to see the GPS data flowing
+      Serial.write(c); // uncomment this line if you want to see the GPS data flowing
       if (gps.encode(c)) {// Did a new valid sentence come in?
         newData = true;
       }
     }
   }
 
-  if (newData)
-  {
+  if ( newData ) {
     gps.f_get_position(&flat, &flon, &age);
     flat = (flat == TinyGPS::GPS_INVALID_F_ANGLE ) ? 0.0 : flat;
     flon = (flon == TinyGPS::GPS_INVALID_F_ANGLE ) ? 0.0 : flon;
   }
-  
+
   gps.stats(&chars, &sentences, &failed);
 
-  int32_t lat = 0;
-  int32_t lon = 0;
+  int32_t lat = flat * 100000;
+  int32_t lon = flon * 100000;
 
-  lat = flat * 100000;
-  lon = flon * 100000;
+  // Pad 2 int32_t to 8 8uint_t, big endian
+  coords[0] = lat;
+  coords[1] = lat >> 8;
+  coords[2] = lat >> 16;
+  coords[3] = lat >> 24;
 
-  coords[0] = lat >> 24;
-  coords[1] = lat >> 16;
-  coords[2] = lat >> 8;
-  coords[3] = lat;
+  coords[4] = lon;
+  coords[5] = lon >> 8;
+  coords[6] = lon >> 16;
+  coords[7] = lon >> 24;
 
-  coords[4] = lon >> 24;
-  coords[5] = lon >> 16;
-  coords[6] = lon >> 8;
-  coords[7] = lon;
+  /*
+  Serial.println( "Getting coords" );
+  char dbg_buffer[50];
+  Serial.println( "Prepared GPS data in 8 bytes" );
+  sprintf( dbg_buffer, "input lat: %ld > %lx", lat, lat );
+  Serial.println( dbg_buffer );
+  sprintf( dbg_buffer, "input lon: %ld > %lx", lon, lon );
+  Serial.println( dbg_buffer );
+  sprintf( dbg_buffer, "output uint8_t[8]: %02x%02x%02x%02x%02x%02x%02x%02x\n", coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[6], coords[7] );
+  Serial.println( dbg_buffer );
+  */
 }
 
-void setup() {
-//  Serial.begin(115200);
-//  Serial.println(F("Starting"));
+void setup()
+{
+  Serial.begin(115200);
+
+  #ifdef JOHAN
+  Serial.println(F("Starting with config: Johan"));
+  #endif
+
+  #ifdef PIETER
+  Serial.println(F("Starting with config: Pieter"));
+  #endif
 
   ss.begin(9600);
 
-  #ifdef VCC_ENABLE
-  // For Pinoccio Scout boards
-  pinMode(VCC_ENABLE, OUTPUT);
-  digitalWrite(VCC_ENABLE, HIGH);
-  delay(1000);
-  #endif
-
   // LMIC init
   os_init();
+
   // Reset the MAC state. Session and pending data transfers will be discarded.
   LMIC_reset();
 
   // Set static session parameters. Instead of dynamically establishing a session
   // by joining the network, precomputed session parameters are be provided.
   #ifdef PROGMEM
-  // On AVR, these values are stored in flash and only copied to RAM
-  // once. Copy them to a temporary buffer here, LMIC_setSession will
-  // copy them into a buffer of its own again.
-  uint8_t appskey[sizeof(APPSKEY)];
-  uint8_t nwkskey[sizeof(NWKSKEY)];
-  memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
-  memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
-  LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
+    // On AVR, these values are stored in flash and only copied to RAM
+    // once. Copy them to a temporary buffer here, LMIC_setSession will
+    // copy them into a buffer of its own again.
+    uint8_t appskey[sizeof(APPSKEY)];
+    uint8_t nwkskey[sizeof(NWKSKEY)];
+    memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
+    memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
+    LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
   #else
-  // If not running an AVR with PROGMEM, just use the arrays directly
-  LMIC_setSession (0x1, DEVADDR, NWKSKEY, APPSKEY);
+    // If not running an AVR with PROGMEM, just use the arrays directly
+    LMIC_setSession (0x1, DEVADDR, NWKSKEY, APPSKEY);
   #endif
 
   // Set up the channels used by the Things Network, which corresponds
@@ -219,26 +235,34 @@ void setup() {
   LMIC_setupChannel(6, 867700000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
   LMIC_setupChannel(7, 867900000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
   LMIC_setupChannel(8, 868800000, DR_RANGE_MAP(DR_FSK,  DR_FSK),  BAND_MILLI);      // g2-band
+
   // TTN defines an additional channel at 869.525Mhz using SF9 for class B
   // devices' ping slots. LMIC does not have an easy way to define set this
   // frequency and support for class B is spotty and untested, so this
   // frequency is not configured here.
 
+  // Disable data rate adaptation
+  LMIC_setAdrMode(0);
+
   // Disable link check validation
   LMIC_setLinkCheckMode(0);
 
+  // Disable beacon tracking
+  LMIC_disableTracking();
+
+  // Stop listening for downstream data (periodical reception)
+  LMIC_stopPingable();
+
   // TTN uses SF9 for its RX2 window.
-  LMIC.dn2Dr = DR_SF9;
+  //LMIC.dn2Dr = DR_SF9;
 
   // Set data rate and transmit power for uplink (note: txpow seems to be ignored by the library)
-  LMIC_setDrTxpow(DR_SF7, 100);
+  LMIC_setDrTxpow(DR_SF7, 14);
 
   // Start job
   do_send(&sendjob);
 }
 
 void loop() {
-//  get_coords();
-//  delay(1000);
-  os_runloop_once();
+  os_runloop();
 }
