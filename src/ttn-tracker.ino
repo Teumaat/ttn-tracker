@@ -4,18 +4,21 @@
 #include <SoftwareSerial.h>
 #include <TinyGPS.h>
 
-TinyGPS gps;
-SoftwareSerial ss(7,8);
+//#define JOHAN
+//#define PIETER
+#define LUUK
 
-#define JOHAN
-// #define PIETER
+TinyGPS gps;
+#ifdef JOHAN || PIETER
+SoftwareSerial ss(7,8);
+#endif
+#ifdef LUUK
+SoftwareSerial ss(5,6);
+#endif
 
 #ifdef PIETER
-// LoRaWAN NwkSKey, network session key
 static const PROGMEM u1_t NWKSKEY[16] = {0x1E, 0xC9, 0x6A, 0x66, 0x67, 0x98, 0xCE, 0x15, 0x6C, 0xB2, 0x55, 0xD9, 0x6E, 0x90, 0x7D, 0xDC};
-// LoRaWAN AppSKey, application session key
 static const u1_t PROGMEM APPSKEY[16] = {0xC9, 0xB5, 0xDD, 0x45, 0x52, 0x3F, 0xAC, 0xE7, 0x9B, 0xCC, 0x53, 0xEB, 0x76, 0x95, 0x12, 0x70};
-// LoRaWAN end-device address (DevAddr)
 static const u4_t DEVADDR = 0x384261A9 ;
 #endif
 
@@ -23,6 +26,12 @@ static const u4_t DEVADDR = 0x384261A9 ;
 static const PROGMEM u1_t NWKSKEY[16] = {0x0C, 0xA1, 0x7F, 0x22, 0x03, 0x41, 0x2D, 0x8A, 0x50, 0x3F, 0x00, 0x8D, 0x39, 0xA1, 0x9E, 0x5C};
 static const u1_t PROGMEM APPSKEY[16] = {0x4C, 0x0B, 0x14, 0xE8, 0x9D, 0x37, 0xA6, 0x4F, 0x96, 0x4E, 0xBC, 0x77, 0xB5, 0x89, 0x7B, 0xAA};
 static const u4_t DEVADDR = 0xC284D049 ;
+#endif
+
+#ifdef LUUK
+static const PROGMEM u1_t NWKSKEY[16] = {0x41, 0x37, 0x56, 0x65, 0xED, 0xC9, 0xFD, 0x61, 0x94, 0x71, 0x1D, 0x88, 0xDE, 0x10, 0xB0, 0x22};
+static const u1_t PROGMEM APPSKEY[16] = {0x9B, 0xF2, 0x3B, 0xF4, 0x83, 0xA7, 0xE0, 0x77, 0xD1, 0xD2, 0x54, 0x0C, 0x26, 0xEA, 0x85, 0x94};
+static const u4_t DEVADDR = 0x6A2A98D2;
 #endif
 
 // These callbacks are only used in over-the-air activation, so they are
@@ -40,12 +49,22 @@ static osjob_t sendjob;
 const unsigned TX_INTERVAL = 60;
 
 // Pin mapping
+#ifdef JOHAN || PIETER
 const lmic_pinmap lmic_pins = {
   .nss = 6,
   .rxtx = LMIC_UNUSED_PIN,
   .rst = 5,
   .dio = {2, 3, 4},
 };
+#endif
+#ifdef LUUK
+const lmic_pinmap lmic_pins = {
+  .nss = 8,
+  .rxtx = LMIC_UNUSED_PIN,
+  .rst = 4,
+  .dio = {7, LMIC_UNUSED_PIN, LMIC_UNUSED_PIN},
+};
+#endif
 
 void onEvent (ev_t ev) {
   Serial.print(os_getTime());
