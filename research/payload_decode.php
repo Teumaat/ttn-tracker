@@ -14,6 +14,6 @@ $payload = pack( "H*", 'EBF107A0C700' );
 $data = unpack('C*', $payload);
 
 // Combine each 3 bytes into a 24bit int
-$lat = $data[1] + ($data[2] << 8) + ($data[3] << 16);
-$lon = $data[4] + ($data[5] << 8) + ($data[6] << 16);
-var_dump( $lat/10000, $lon/10000 );
+$lat = ($data[1] + ($data[2] << 8) + ($data[3] << 16)) / 10000;
+$lon = ($data[4] + ($data[5] << 8) + ($data[6] << 16)) / 10000;
+var_dump( $lat, $lon );

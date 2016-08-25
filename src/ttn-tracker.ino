@@ -34,9 +34,9 @@ static const u4_t DEVADDR = 0x6A2A98D2;
 #endif
 
 #ifdef OTAA
-void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
-void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
-void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
+void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8); }
+void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8); }
+void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16); }
 #else
 void os_getArtEui (u1_t* buf) { }
 void os_getDevEui (u1_t* buf) { }
@@ -46,9 +46,8 @@ void os_getDevKey (u1_t* buf) { }
 uint8_t coords[6];
 static osjob_t sendjob;
 
-// Schedule TX every this many seconds (might become longer due to duty
-// cycle limitations).
-const unsigned TX_INTERVAL = 60;
+// Schedule TX every this many seconds (might become longer due to duty cycle limitations).
+const unsigned TX_INTERVAL = 30;
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -218,5 +217,5 @@ void setup()
 }
 
 void loop() {
-  os_runloop();
+  os_runloop_once();
 }
